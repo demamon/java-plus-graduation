@@ -1,0 +1,58 @@
+spring:
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: false
+      routes:
+        - id: private_request_service_route
+          uri: lb://ewm-server
+          predicates:
+            - Path=/users/{user-id}/requests/**
+
+        - id: admin_comment_service_route
+          uri: lb://ewm-server
+          predicates:
+            - Path=/admin/events/{event-id}/comments/{comment-id}
+
+        - id: open_comment_service_route
+          uri: lb://ewm-server
+          predicates:
+            - Path=/events/{event-id}/comments
+
+        - id: private_comment_service_route
+          uri: lb://ewm-server
+          predicates:
+            - Path=/users/{user-id}/events/{event-id}/comments
+
+        - id: categories_routes
+          uri: lb://ewm-server
+          predicates:
+            - Path=/admin/categories/**,/categories/**
+
+        - id: compilations_routes
+          uri: lb://ewm-server
+          predicates:
+            - Path=/admin/compilations/**,/compilations/**
+
+        - id: events_routes
+          uri: lb://ewm-server
+          predicates:
+            - Path=/admin/events/**,/events/**
+
+        - id: user_management_routes
+          uri: lb://ewm-server
+          predicates:
+            - Path=/users/**,/admin/users/**
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: '*'
+  endpoint:
+    gateway:
+      enabled: true

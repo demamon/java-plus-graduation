@@ -97,8 +97,7 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-                    <mainClass>ru.practicum.ewm.EWMServer</mainClass>
-                    <layout>JAR</layout>
+                    <executable>true</executable> <!-- Создаем исполняемый JAR -->
                 </configuration>
                 <executions>
                     <execution>
@@ -110,4 +109,5 @@
             </plugin>
         </plugins>
     </build>
+
 </project>

@@ -80,8 +80,7 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-                    <mainClass>ru.practicum.stats.StatsServer</mainClass>
-                    <layout>JAR</layout>
+                    <executable>true</executable> <!-- Создаем исполняемый JAR -->
                 </configuration>
                 <executions>
                     <execution>

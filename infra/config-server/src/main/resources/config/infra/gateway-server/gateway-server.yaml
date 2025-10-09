@@ -6,42 +6,42 @@ spring:
           enabled: false
       routes:
         - id: private_request_service_route
-          uri: lb://main-server
+          uri: lb://main-service
           predicates:
             - Path=/users/{user-id}/requests/**
 
         - id: admin_comment_service_route
-          uri: lb://main-server
+          uri: lb://main-service
           predicates:
             - Path=/admin/events/{event-id}/comments/{comment-id}
 
         - id: open_comment_service_route
-          uri: lb://main-server
+          uri: lb://main-service
           predicates:
             - Path=/events/{event-id}/comments
 
         - id: private_comment_service_route
-          uri: lb://main-server
+          uri: lb://main-service
           predicates:
             - Path=/users/{user-id}/events/{event-id}/comments
 
         - id: categories_routes
-          uri: lb://main-server
+          uri: lb://main-service
           predicates:
             - Path=/admin/categories/**,/categories/**
 
         - id: compilations_routes
-          uri: lb://main-server
+          uri: lb://main-service
           predicates:
             - Path=/admin/compilations/**,/compilations/**
 
         - id: events_routes
-          uri: lb://main-server
+          uri: lb://main-service
           predicates:
             - Path=/admin/events/**,/events/**
 
         - id: user_management_routes
-          uri: lb://main-server
+          uri: lb://main-service
           predicates:
             - Path=/users/**,/admin/users/**
 

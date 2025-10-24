@@ -1,6 +1,7 @@
 package ru.practicum.request.service.controller;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.interaction.api.dto.request.PrivateRequestParam;
@@ -12,6 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping(path = "/users/{user-id}/requests")
 @RequiredArgsConstructor
+@Slf4j
 public class PrivateRequestController {
 
     private final RequestService requestService;
@@ -27,6 +29,7 @@ public class PrivateRequestController {
     @GetMapping("/event/{event-id}")
     List<ParticipationRequestDto> findUserEventRequests(@PathVariable(name = "user-id") Long userId,
                                                         @PathVariable(name = "event-id") Long eventId) {
+        log.debug("мы в контроллере после feign, userId = {}, eventId = {}", userId, eventId);
         return requestService.findUserEventRequests(userId, eventId);
     }
 

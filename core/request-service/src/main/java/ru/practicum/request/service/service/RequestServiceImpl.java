@@ -2,6 +2,7 @@ package ru.practicum.request.service.service;
 
 import com.querydsl.core.types.dsl.BooleanExpression;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.interaction.api.dto.event.EventFullDto;
@@ -26,6 +27,7 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@Slf4j
 public class RequestServiceImpl implements RequestService {
     private final RequestRepository requestRepository;
     private final EventClient eventClient;
@@ -42,7 +44,7 @@ public class RequestServiceImpl implements RequestService {
                 .reduce(BooleanExpression::and)
                 .get();
 
-        return RequestMapper.mapToRequestDtoList(requestRepository.findAll(finalCondition));
+        return RequestMapper.mapToRequestDto(requestRepository.findAll(finalCondition));
     }
 
     @Transactional
@@ -52,6 +54,7 @@ public class RequestServiceImpl implements RequestService {
         UserDto requester = userClient.getUserFull(userId);
         long eventId = param.getEventId();
         EventFullDto event = eventClient.getEvent(eventId);
+        log.debug("юзер подающий запрос {}, событие {}", requester, event);
         if (checkDuplicatedRequest(param))
             throw new ConflictException("Нельзя добавить повторный запрос");
         if (event.getInitiator().getId().equals(requester.getId()))
@@ -66,6 +69,7 @@ public class RequestServiceImpl implements RequestService {
 
         if (!event.getRequestModeration() || event.getParticipantLimit() == 0) {
             request.setState(RequestState.CONFIRMED);
+            log.debug("увеличиваем количество запросов на 1");
             eventClient.increaseCountOfConfirmedRequest(event.getId());
         } else {
             request.setState(RequestState.PENDING);
@@ -87,7 +91,7 @@ public class RequestServiceImpl implements RequestService {
                 .get();
 
         Iterable<Request> requestsFromRep = requestRepository.findAll(finalCondition);
-        List<ParticipationRequestDto> requestsDto = RequestMapper.mapToRequestDtoList(requestsFromRep);
+        List<ParticipationRequestDto> requestsDto = RequestMapper.mapToRequestDto(requestsFromRep);
 
         return !requestsDto.isEmpty();
     }
@@ -112,9 +116,21 @@ public class RequestServiceImpl implements RequestService {
 
     @Override
     public List<ParticipationRequestDto> findUserEventRequests(Long userId, Long eventId) {
-        BooleanExpression condition = QRequest.request.requesterId.eq(userId)
-                .and(QRequest.request.eventId.eq(eventId));
-        return RequestMapper.mapToRequestDtoList(requestRepository.findAll(condition));
+        log.debug("Поиск запросов: userId = {}, eventId = {}", userId, eventId);
+
+        List<Request> allRequests = requestRepository.findAll();
+
+        log.debug("Все запросы в БД: {}", allRequests);
+
+        BooleanExpression condition = QRequest.request.eventId.eq(eventId);
+
+        Iterable<Request> requestsIterable = requestRepository.findAll(condition);
+
+        List<Request> debugList = new ArrayList<>();
+        requestsIterable.forEach(debugList::add);
+        log.debug("Найденные запросы: {}", debugList);
+
+        return RequestMapper.mapToRequestDto(requestsIterable);
     }
 
     @Override
@@ -126,6 +142,7 @@ public class RequestServiceImpl implements RequestService {
         return RequestMapper.mapToRequestDto(mayBeRequest.get());
     }
 
+    @Transactional
     @Override
     public void saveRequest(ParticipationRequestDto requestDto) {
         Request request = RequestMapper.mapToRequest(requestDto);

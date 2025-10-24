@@ -168,7 +168,12 @@ public class EventServiceImpl implements EventService {
 
     @Override
     public List<ParticipationRequestDto> getRequestsOfUser(PrivateEventParam param) {
-
+        log.debug("возвращаем запросы на события пользователя {}", param);
+        eventRepository.findByIdAndInitiatorId(param.getEventId(), param.getUserId())
+                .orElseThrow(() -> new NotFoundException(
+                        String.format("Событие id = %d не найдено у пользователя id = %d",
+                                param.getEventId(), param.getUserId()))
+                );
         return requestClient.findUserEventRequests(
                 param.getUserId(),
                 param.getEventId()
@@ -363,13 +368,17 @@ public class EventServiceImpl implements EventService {
         return eventDto;
     }
 
+    @Transactional
     @Override
     public void increaseCountOfConfirmedRequest(Long eventId) {
         Event event = eventRepository.findById(eventId).get();
+        log.debug("события для увеличения счетчика запросов {}", event);
         event.increaseCountOfConfirmedRequest();
+        log.debug("счетчик увеличили {}", event);
         eventRepository.save(event);
     }
 
+    @Transactional
     @Override
     public void decreaseCountOfConfirmedRequest(Long eventId) {
         Event event = eventRepository.findById(eventId).get();

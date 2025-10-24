@@ -1,0 +1,94 @@
+package ru.practicum.user.service.service;
+
+import com.querydsl.core.types.dsl.BooleanExpression;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import ru.practicum.interaction.api.dto.user.AdminUserParam;
+import ru.practicum.interaction.api.dto.user.UserShortDto;
+import ru.practicum.user.service.model.QUser;
+import ru.practicum.user.service.model.User;
+import ru.practicum.user.service.mapper.UserMapper;
+import ru.practicum.user.service.repository.UserRepository;
+import ru.practicum.interaction.api.dto.user.NewUserRequest;
+import ru.practicum.interaction.api.dto.user.UserDto;
+import ru.practicum.user.service.exception.DuplicatedEmailException;
+import ru.practicum.user.service.exception.NotFoundException;
+
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class UserServiceImpl implements UserService {
+    private final UserRepository userRepository;
+
+    @Override
+    public List<UserDto> getUsers(AdminUserParam param) {
+        QUser user = QUser.user;
+        List<BooleanExpression> conditions = new ArrayList<>();
+
+        Sort sortById = Sort.by(Sort.Direction.ASC, "id");
+        Pageable page = PageRequest.of(param.getFrom(), param.getSize(), sortById);
+
+        if (param.getIds() != null) {
+            for (Long paramId : param.getIds())
+                conditions.add(QUser.user.id.eq(paramId));
+        } else
+            return UserMapper.mapToUserDto(userRepository.findAll(page));
+
+        BooleanExpression finalCondition = conditions.stream()
+                .reduce(BooleanExpression::and)
+                .get();
+
+
+        return UserMapper.mapToUserDto(userRepository.findAll(finalCondition, page));
+    }
+
+    @Transactional
+    @Override
+    public UserDto createUser(NewUserRequest userFromRequest) {
+        checkDuplicatedEmail(userFromRequest.getEmail());
+        User newUser = userRepository.save(UserMapper.mapFromRequest(userFromRequest));
+
+        return UserMapper.mapToUserDto(newUser);
+    }
+
+    @Transactional
+    @Override
+    public void removeUser(long userId) {
+        if (userRepository.findById(userId).isEmpty()) {
+            throw new NotFoundException(String.format("Пользователь id = %d не найден", userId));
+        }
+        userRepository.deleteById(userId);
+    }
+
+    @Override
+    public User getUserFull(long userId) {
+        Optional<User> mayBeUser = userRepository.findById(userId);
+        if (mayBeUser.isEmpty()) {
+            throw new NotFoundException(String.format("Пользователь id = %d не найден", userId));
+        }
+        return mayBeUser.get();
+    }
+
+    @Override
+    public UserShortDto getUserShort(long userId) {
+        Optional<User> mayBeUser = userRepository.findById(userId);
+        if (mayBeUser.isEmpty()) {
+            throw new NotFoundException(String.format("Пользователь id = %d не найден", userId));
+        }
+        return UserMapper.mapToUserShortDto(mayBeUser.get());
+    }
+
+    private void checkDuplicatedEmail(String email) {
+        if (userRepository.findByEmailLike(email).isPresent())
+            throw new DuplicatedEmailException(String.format("Пользователь с email = %s  уже существует", email));
+    }
+}

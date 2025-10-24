@@ -1,14 +1,75 @@
 services:
-  stats-server:
-    ports:
-      - "9090:9090"
-
   stats-db:
-    image: postgres:16.1
-
-  ewm-service:
+    image: postgres:17.5
+    container_name: stats-db
     ports:
-      - "8080:8080"
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=stats
+      - POSTGRES_USER=stats
+      - POSTGRES_DB=stats
+    healthcheck:
+      test: pg_isready -q -d $$POSTGRES_DB -U $$POSTGRES_USER
+      timeout: 5s
+      interval: 5s
+      retries: 10
 
-  ewm-db:
-    image: postgres:16.1
+  events-db:
+    image: postgres:17.5
+    container_name: events-db
+    ports:
+      - "6432:5432"
+    environment:
+      - POSTGRES_PASSWORD=event
+      - POSTGRES_USER=event
+      - POSTGRES_DB=event
+    healthcheck:
+      test: pg_isready -q -d $$POSTGRES_DB -U $$POSTGRES_USER
+      timeout: 5s
+      interval: 5s
+      retries: 10
+
+  users-db:
+    image: postgres:17.5
+    container_name: users-db
+    ports:
+      - "6431:5432"
+    environment:
+      - POSTGRES_PASSWORD=user
+      - POSTGRES_USER=user
+      - POSTGRES_DB=user
+    healthcheck:
+      test: pg_isready -q -d $$POSTGRES_DB -U $$POSTGRES_USER
+      timeout: 5s
+      interval: 5s
+      retries: 10
+
+  requests-db:
+    image: postgres:17.5
+    container_name: requests-db
+    ports:
+      - "6430:5432"
+    environment:
+      - POSTGRES_PASSWORD=request
+      - POSTGRES_USER=request
+      - POSTGRES_DB=request
+    healthcheck:
+      test: pg_isready -q -d $$POSTGRES_DB -U $$POSTGRES_USER
+      timeout: 5s
+      interval: 5s
+      retries: 10
+
+  comments-db:
+    image: postgres:17.5
+    container_name: comments-db
+    ports:
+      - "6429:5432"
+    environment:
+      - POSTGRES_PASSWORD=comment
+      - POSTGRES_USER=comment
+      - POSTGRES_DB=comment
+    healthcheck:
+      test: pg_isready -q -d $$POSTGRES_DB -U $$POSTGRES_USER
+      timeout: 5s
+      interval: 5s
+      retries: 10

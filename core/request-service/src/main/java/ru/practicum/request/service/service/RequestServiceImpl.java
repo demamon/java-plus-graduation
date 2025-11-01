@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.practicum.ewm.grpc.stats.event.ActionTypeProto;
 import ru.practicum.interaction.api.dto.event.EventFullDto;
 import ru.practicum.interaction.api.dto.user.UserDto;
 import ru.practicum.interaction.api.enums.event.EventState;
@@ -19,7 +20,9 @@ import ru.practicum.interaction.api.dto.request.ParticipationRequestDto;
 import ru.practicum.interaction.api.dto.request.PrivateRequestParam;
 import ru.practicum.interaction.api.enums.request.RequestState;
 import ru.practicum.interaction.api.feign.user.UserClient;
+import ru.practicum.stats.client.UserActionClient;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -32,6 +35,7 @@ public class RequestServiceImpl implements RequestService {
     private final RequestRepository requestRepository;
     private final EventClient eventClient;
     private final UserClient userClient;
+    private final UserActionClient userActionClient;
 
     @Override
     public List<ParticipationRequestDto> getRequestOfCurrentUser(PrivateRequestParam param) {
@@ -76,6 +80,9 @@ public class RequestServiceImpl implements RequestService {
         }
 
         Request newRequest = requestRepository.save(request);
+
+        userActionClient.collectUserAction(eventId, userId, ActionTypeProto.ACTION_REGISTER, Instant.now())
+        ;
         return RequestMapper.mapToRequestDto(newRequest);
     }
 
@@ -147,6 +154,11 @@ public class RequestServiceImpl implements RequestService {
     public void saveRequest(ParticipationRequestDto requestDto) {
         Request request = RequestMapper.mapToRequest(requestDto);
         requestRepository.save(request);
+    }
+
+    @Override
+    public Boolean checkExistStatusRequest(Long eventId, Long userId, RequestState state) {
+        return requestRepository.existsByEventIdAndRequesterIdAndState(eventId, userId, state);
     }
 
 }

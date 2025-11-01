@@ -3,6 +3,7 @@ package ru.practicum.interaction.api.feign.request;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.interaction.api.dto.request.ParticipationRequestDto;
+import ru.practicum.interaction.api.enums.request.RequestState;
 
 
 import java.util.List;
@@ -20,5 +21,9 @@ public interface RequestClient {
     @PostMapping("/users/{user-id}/requests/save")
     void saveRequest(@PathVariable(name = "user-id") Long userId,
                      @RequestBody ParticipationRequestDto request);
+
+    @GetMapping("/users/{user-id}/requests/{eventId}/check-user-confirmed/{userId}")
+    boolean checkExistStatusRequest(@PathVariable Long eventId,@PathVariable Long userId,
+                                    @RequestParam RequestState state);
 }
 

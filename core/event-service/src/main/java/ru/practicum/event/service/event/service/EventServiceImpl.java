@@ -12,13 +12,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.practicum.client.StatsClient;
-import ru.practicum.dto.ViewDto;
-import ru.practicum.dto.NewHitDto;
 import ru.practicum.event.service.category.model.Category;
 import ru.practicum.event.service.category.repository.CategoryRepository;
 import ru.practicum.event.service.event.mapper.EventMapper;
 import ru.practicum.event.service.event.model.Event;
+import ru.practicum.ewm.grpc.stats.event.ActionTypeProto;
+import ru.practicum.ewm.grpc.stats.event.RecommendedEventProto;
 import ru.practicum.interaction.api.enums.event.EventState;
 import ru.practicum.event.service.event.model.Location;
 import ru.practicum.event.service.event.model.QEvent;
@@ -36,14 +35,14 @@ import ru.practicum.interaction.api.dto.request.ParticipationRequestDto;
 import ru.practicum.interaction.api.enums.request.RequestState;
 import ru.practicum.interaction.api.feign.request.RequestClient;
 import ru.practicum.interaction.api.feign.user.UserClient;
+import ru.practicum.stats.client.RecommendationsClient;
+import ru.practicum.stats.client.UserActionClient;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.Collection;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -56,7 +55,8 @@ public class EventServiceImpl implements EventService {
     private final CategoryRepository categoryRepository;
     private final LocationRepository locationRepository;
     private final RequestClient requestClient;
-    private final StatsClient statsClient;
+    private final UserActionClient userActionClient;
+    private final RecommendationsClient recommendationsClient;
     private final JPAQueryFactory queryFactory;
     private final EventMapper eventMapper;
 
@@ -77,56 +77,16 @@ public class EventServiceImpl implements EventService {
         Sort sortById = Sort.by(Sort.Direction.ASC, "id");
         Pageable page = PageRequest.of(param.getFrom(), param.getSize(), sortById);
 
-        List<EventFullDto> events = eventMapper.mapToEventFullDtoList(eventRepository.findAll(finalCondition, page));
-
-        List<String> uris = events.stream()
-                .map(event -> "/events/" + event.getId())
-                .toList();
-
-        List<ViewDto> views = statsClient.getStats(
-                "2020-05-05 00:00:00",
-                "2035-05-05 00:00:00",
-                uris,
-                false);
-
-        events = events.stream()
-                .peek(event -> {
-                    Optional<Integer> countViews = views.stream()
-                            .filter(view -> view.getUri().contains(event.getId().toString()))
-                            .map(ViewDto::getHits)
-                            .findFirst();
-                    if (countViews.isEmpty())
-                        event.setViews(0);
-                    else
-                        event.setViews(countViews.get());
-                })
-                .toList();
-
-        return events;
+        return eventMapper.mapToEventFullDtoList(eventRepository.findAll(finalCondition, page));
     }
 
     @Override
     public EventFullDto getEventOfUser(PrivateEventParam param) {
-        EventFullDto event = eventMapper.mapToEventFullDto(
+        return eventMapper.mapToEventFullDto(
                 eventRepository.findByIdAndInitiatorId(param.getEventId(), param.getUserId()).orElseThrow(
                         () -> new NotFoundException(String.format("Событие id = %d не найдено", param.getEventId()))
                 )
         );
-
-        String uri = "/events/" + param.getEventId();
-
-        List<ViewDto> views = statsClient.getStats(
-                "2020-05-05 00:00:00",
-                "2035-05-05 00:00:00",
-                List.of(uri),
-                false);
-
-        if (views.isEmpty())
-            event.setViews(0);
-        else
-            event.setViews(views.getFirst().getHits());
-
-        return event;
     }
 
     @Transactional
@@ -233,7 +193,6 @@ public class EventServiceImpl implements EventService {
         log.debug("параметры для фильтрации {}", filter);
         log.debug("все события что есть в бд {}", eventRepository.findAll());
         checkFilterDateRangeIsGood(filter.getRangeStart(), filter.getRangeEnd());
-        saveView(request);
         List<Event> events;
         QEvent event = QEvent.event;
         BooleanExpression exp;
@@ -265,13 +224,8 @@ public class EventServiceImpl implements EventService {
         events = query.fetch();
         log.debug("события получаемы из бд после фильтрации {}", events);
         return events.stream()
-                .map(event1 -> {
-                    EventShortDto eventShortDto = eventMapper.mapToEventShortDto(event1);
-                    eventShortDto.setViews(countView(event1.getId(), event1.getCreatedOn(), LocalDateTime.now()));
-                    return eventShortDto;
-                })
-                .sorted((e1, e2) -> filter.getSort() == null || filter.getSort().equals("EVENT_DATE") ?
-                        e1.getEventDate().compareTo(e2.getEventDate()) : e1.getViews().compareTo(e2.getViews()))
+                .map(eventMapper::mapToEventShortDto)
+                .sorted(Comparator.comparing(EventShortDto::getEventDate))
                 .collect(Collectors.toCollection(ArrayList::new));
     }
 
@@ -309,25 +263,20 @@ public class EventServiceImpl implements EventService {
         events = query.fetch();
         log.debug("события получаемы из бд после фильтрации {}", events);
         return events.stream()
-                .map(event1 -> {
-                    EventFullDto eventFullDto = eventMapper.mapToEventFullDto(event1);
-                    eventFullDto.setViews(countView(event1.getId(), event1.getCreatedOn(), LocalDateTime.now()));
-                    return eventFullDto;
-                })
+                .map(eventMapper::mapToEventFullDto)
                 .collect(Collectors.toCollection(ArrayList::new));
     }
 
     @Override
-    public EventFullDto getPublicEvent(Long eventId, HttpServletRequest request) {
+    public EventFullDto getPublicEvent(Long eventId, Long userId) {
         final Event event = findEventById(eventId);
 
         if (!event.getState().equals(EventState.PUBLISHED)) {
             throw new NotFoundException("Event with id=" + eventId + " was not found");
-        } else {
-            saveView(request);
         }
+
         final EventFullDto eventDto = eventMapper.mapToEventFullDto(event);
-        eventDto.setViews(countView(event.getId(), event.getCreatedOn(), LocalDateTime.now()));
+        userActionClient.collectUserAction(eventId, userId, ActionTypeProto.ACTION_VIEW, Instant.now());
         return eventDto;
     }
 
@@ -351,9 +300,7 @@ public class EventServiceImpl implements EventService {
         }
         eventRepository.save(event);
         log.debug("обновленное событие {}", event);
-        EventFullDto eventFullDto = eventMapper.mapToEventFullDto(event);
-        eventFullDto.setViews(countView(event.getId(), event.getCreatedOn(), LocalDateTime.now()));
-        return eventFullDto;
+        return eventMapper.mapToEventFullDto(event);
     }
 
     @Override
@@ -363,9 +310,7 @@ public class EventServiceImpl implements EventService {
             throw new NotFoundException("события с id = " + eventId + "не найдено");
         }
         Event event = mayBeEvent.get();
-        final EventFullDto eventDto = eventMapper.mapToEventFullDto(event);
-        eventDto.setViews(countView(event.getId(), event.getCreatedOn(), LocalDateTime.now()));
-        return eventDto;
+        return eventMapper.mapToEventFullDto(event);
     }
 
     @Transactional
@@ -384,6 +329,24 @@ public class EventServiceImpl implements EventService {
         Event event = eventRepository.findById(eventId).get();
         event.decreaseCountOfConfirmedRequest();
         eventRepository.save(event);
+    }
+
+    @Override
+    public List<EventShortDto> getEventsRecommendations(Long userId, Integer maxResults) {
+        Map<Long, Double> recommendations = recommendationsClient
+                .getRecommendationsForUser(userId, maxResults)
+                .collect(Collectors.toMap(RecommendedEventProto::getEventId, RecommendedEventProto::getScore));
+
+        List<Event> events = eventRepository.findAllById(recommendations.keySet());
+        return eventMapper.mapToEventShortDto(events);
+    }
+
+    @Override
+    public void addLikeToEvent(Long eventId, Long userId) {
+        if (!requestClient.checkExistStatusRequest(eventId, userId, RequestState.CONFIRMED)) {
+            throw new ValidationException("Пользователь не участвует в этом событии.");
+        }
+        userActionClient.collectUserAction(eventId, userId, ActionTypeProto.ACTION_LIKE, Instant.now());
     }
 
     private void checkFilterDateRangeIsGood(LocalDateTime dateBegin, LocalDateTime dateEnd) {
@@ -405,26 +368,6 @@ public class EventServiceImpl implements EventService {
         return eventRepository.findById(eventId).orElseThrow(
                 () -> new NotFoundException("Публичное событие с id = " + eventId + " не найдено")
         );
-    }
-
-    private void saveView(HttpServletRequest request) {
-        NewHitDto hitDto = NewHitDto.builder()
-                .app("ewm-main-service")
-                .ip(request.getRemoteAddr())
-                .uri(request.getRequestURI())
-                .timestamp(LocalDateTime.now().format(formatter))
-                .build();
-        statsClient.registerHit(hitDto);
-    }
-
-    private Integer countView(Long eventId, LocalDateTime start, LocalDateTime end) {
-        List<String> uris = List.of("/events/" + eventId);
-        List<ViewDto> views = statsClient.getStats(start.format(formatter), end.format(formatter), uris, true);
-        Optional<Integer> countViews = views.stream()
-                .filter(view -> view.getUri().contains(eventId.toString()))
-                .map(ViewDto::getHits)
-                .findFirst();
-        return countViews.orElse(0);
     }
 
     private void validateEventDateForAdmin(LocalDateTime eventDate, String stateAction) {

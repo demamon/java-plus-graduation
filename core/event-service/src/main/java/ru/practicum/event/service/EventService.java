@@ -6,7 +6,7 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.openfeign.EnableFeignClients;
 
 @SpringBootApplication(scanBasePackages = {
-        "ru.practicum.stats.client"})
+        "ru.practicum"})
 @EnableDiscoveryClient
 @EnableFeignClients("ru.practicum")
 public class EventService {

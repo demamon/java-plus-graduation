@@ -29,5 +29,4 @@ public class EventFullDto {
     Boolean requestModeration;
     EventState state;
     String title;
-    Double rating;
 }

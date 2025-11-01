@@ -62,14 +62,3 @@ logging:
     org.springframework.cloud.gateway: DEBUG
     org.springframework.cloud.loadbalancer: TRACE
     reactor.netty.http.client: DEBUG
-
-
-  cloud:
-    loadbalancer:
-      cache:
-        enabled: false  # временно отключаем кэш для отладки
-    gateway:
-      discovery:
-        locator:
-          enabled: true  # включаем автоматическое обнаружение
-          lower-case-service-id: true

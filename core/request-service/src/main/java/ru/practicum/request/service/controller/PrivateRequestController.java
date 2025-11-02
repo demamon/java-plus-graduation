@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.interaction.api.dto.request.PrivateRequestParam;
 import ru.practicum.interaction.api.dto.request.ParticipationRequestDto;
+import ru.practicum.interaction.api.enums.request.RequestState;
 import ru.practicum.request.service.service.RequestService;
 
 import java.util.List;
@@ -64,6 +65,12 @@ public class PrivateRequestController {
     void saveRequest(@PathVariable(name = "user-id") long userId,
                      @RequestBody ParticipationRequestDto request) {
         requestService.saveRequest(request);
+    }
+
+    @GetMapping("/{eventId}/check-user-confirmed/{userId}")
+    public boolean checkExistStatusRequest(@PathVariable Long eventId,@PathVariable Long userId,
+                                                               @RequestParam RequestState state) {
+        return requestService.checkExistStatusRequest(eventId, userId, state);
     }
 
 

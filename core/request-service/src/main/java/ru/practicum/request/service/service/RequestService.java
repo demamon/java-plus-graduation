@@ -2,6 +2,7 @@ package ru.practicum.request.service.service;
 
 import ru.practicum.interaction.api.dto.request.ParticipationRequestDto;
 import ru.practicum.interaction.api.dto.request.PrivateRequestParam;
+import ru.practicum.interaction.api.enums.request.RequestState;
 import ru.practicum.request.service.model.Request;
 
 import java.util.List;
@@ -19,4 +20,6 @@ public interface RequestService {
     ParticipationRequestDto getRequest(Long requestId);
 
     void saveRequest(ParticipationRequestDto request);
+
+    Boolean checkExistStatusRequest(Long eventId, Long userId, RequestState state);
 }

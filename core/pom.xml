@@ -19,10 +19,8 @@
         <module>comment-service</module>
     </modules>
 
-    <!-- Добавить dependencyManagement для управления версиями -->
     <dependencyManagement>
         <dependencies>
-            <!-- QueryDSL -->
             <dependency>
                 <groupId>com.querydsl</groupId>
                 <artifactId>querydsl-jpa</artifactId>
@@ -36,7 +34,6 @@
                 <classifier>jakarta</classifier>
             </dependency>
 
-            <!-- Jakarta Persistence -->
             <dependency>
                 <groupId>jakarta.persistence</groupId>
                 <artifactId>jakarta.persistence-api</artifactId>

@@ -50,6 +50,4 @@ public class EventDto {
     private String state;
 
     private String title;
-
-    private Long views;
 }
